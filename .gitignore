@@ -1,0 +1,83 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Next.js
+/.next/
+/out/
+
+# Production
+/build
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Local env files (keep .env.example for reference)
+.env
+.env*.local
+.env.development
+.env.production
+env.txt
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Database files (don't commit SQL dumps)
+*.sql
+*.db
+*.sqlite
+
+# Claude AI artifacts
+.claude/
+
+# Documentation files (keep README.md)
+*_SETUP.md
+*_INTEGRATION.md
+*_VALIDATION.md
+*_ADJUSTMENT.md
+*_TROUBLESHOOTING.md
+*_FEATURE.md
+NOTIFICATIONS_SETUP.md
+POINTS_SYSTEM_SETUP.md
+LEADERBOARD_POINTS_INTEGRATION.md
+ADMIN_ACCESS_VALIDATION.md
+MANUAL_POINTS_ADJUSTMENT.md
+REALTIME_TROUBLESHOOTING.md
+POPUP_NOTIFICATIONS_FEATURE.md
