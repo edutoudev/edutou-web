@@ -108,7 +108,12 @@ export default function LoginPage() {
         console.log("Password reset for:", email)
         setLoading(false)
       }
-    } catch (err) {
+    } catch (err: any) {
+      // Check if this is a redirect error from Next.js - if so, rethrow it
+      // Next.js redirect errors have a digest that starts with NEXT_REDIRECT
+      if (err?.digest?.startsWith('NEXT_REDIRECT')) {
+        throw err
+      }
       setError(err instanceof Error ? err.message : "An error occurred")
       setLoading(false)
     }
