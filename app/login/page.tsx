@@ -82,51 +82,34 @@ export default function LoginPage() {
     const formElement = e.currentTarget
     const formData = new FormData(formElement)
 
-    if (currentView === "login") {
-      const result = await login(formData)
+    try {
+      if (currentView === "login") {
+        await login(formData)
+      } else if (currentView === "register") {
+        const password = formData.get('password') as string
+        const confirmPassword = formData.get('confirmPassword') as string
 
-      if (result.error) {
-        setError(result.error)
+        if (password !== confirmPassword) {
+          setError("Passwords do not match")
+          setLoading(false)
+          return
+        }
+
+        await signup(formData)
+      } else if (currentView === "forgot") {
+        // Handle forgot password
+        const email = formData.get('email') as string
+        if (!email) {
+          setError("Email is required")
+          setLoading(false)
+          return
+        }
+        // Add your password reset logic here
+        console.log("Password reset for:", email)
         setLoading(false)
-        return
       }
-
-      if (result.success && result.redirectTo) {
-        router.push(result.redirectTo)
-        return
-      }
-    } else if (currentView === "register") {
-      const password = formData.get('password') as string
-      const confirmPassword = formData.get('confirmPassword') as string
-
-      if (password !== confirmPassword) {
-        setError("Passwords do not match")
-        setLoading(false)
-        return
-      }
-
-      const result = await signup(formData)
-
-      if (result.error) {
-        setError(result.error)
-        setLoading(false)
-        return
-      }
-
-      if (result.success && result.redirectTo) {
-        router.push(result.redirectTo)
-        return
-      }
-    } else if (currentView === "forgot") {
-      // Handle forgot password
-      const email = formData.get('email') as string
-      if (!email) {
-        setError("Email is required")
-        setLoading(false)
-        return
-      }
-      // Add your password reset logic here
-      console.log("Password reset for:", email)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred")
       setLoading(false)
     }
   }

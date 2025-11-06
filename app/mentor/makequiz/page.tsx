@@ -106,8 +106,20 @@ export default function MakeQuizPage() {
   const fetchSavedQuizzes = async () => {
     try {
       setLoadingQuizzes(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      console.log('Fetching user...')
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+      if (userError) {
+        console.error('User error:', userError)
+        throw userError
+      }
+
+      if (!user) {
+        console.log('No user logged in')
+        return
+      }
+
+      console.log('User ID:', user.id)
 
       const { data, error } = await supabase
         .from('quizzes')
@@ -115,10 +127,13 @@ export default function MakeQuizPage() {
         .eq('created_by', user.id)
         .order('created_at', { ascending: false })
 
+      console.log('Query result:', { data, error })
+
       if (error) throw error
       setSavedQuizzes(data || [])
     } catch (error) {
       console.error('Error fetching quizzes:', error)
+      console.error('Error details:', JSON.stringify(error, null, 2))
     } finally {
       setLoadingQuizzes(false)
     }
@@ -267,17 +282,27 @@ export default function MakeQuizPage() {
 
     try {
       setSaving(true)
+      console.log('Starting save draft...')
 
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+      if (userError) {
+        console.error('User error:', userError)
+        throw userError
+      }
+
       if (!user) {
         alert('Please log in to save quizzes')
         return
       }
 
+      console.log('User authenticated:', user.id)
+
       // Convert questions to database format before saving
       const convertedQuestions = convertQuizForDatabase()
+      console.log('Converted questions:', convertedQuestions)
 
-      const { data: existingQuiz } = await supabase
+      const { data: existingQuiz, error: checkError } = await supabase
         .from('quizzes')
         .select('id')
         .eq('title', quiz.title)
@@ -285,8 +310,11 @@ export default function MakeQuizPage() {
         .eq('status', 'draft')
         .single()
 
+      console.log('Existing quiz check:', { existingQuiz, checkError })
+
       if (existingQuiz) {
         // Update existing draft
+        console.log('Updating existing quiz:', existingQuiz.id)
         const { error } = await supabase
           .from('quizzes')
           .update({
@@ -296,9 +324,14 @@ export default function MakeQuizPage() {
           })
           .eq('id', existingQuiz.id)
 
-        if (error) throw error
+        if (error) {
+          console.error('Update error:', error)
+          throw error
+        }
+        console.log('Quiz updated successfully')
       } else {
         // Create new draft
+        console.log('Creating new quiz')
         const { error } = await supabase
           .from('quizzes')
           .insert({
@@ -309,13 +342,19 @@ export default function MakeQuizPage() {
             created_by: user.id,
           })
 
-        if (error) throw error
+        if (error) {
+          console.error('Insert error:', error)
+          throw error
+        }
+        console.log('Quiz created successfully')
       }
 
       alert('Quiz saved as draft successfully!')
       await fetchSavedQuizzes() // Refresh the list
     } catch (error) {
       console.error('Error saving draft:', error)
+      console.error('Error type:', typeof error)
+      console.error('Error details:', JSON.stringify(error, null, 2))
       alert('Failed to save draft. Please try again.')
     } finally {
       setSaving(false)

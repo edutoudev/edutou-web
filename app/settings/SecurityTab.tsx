@@ -20,31 +20,24 @@ export function SecurityTab() {
 
     const [loading, setLoading] = useState(false)
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
-    const [authProvider, setAuthProvider] = useState<string | null>(null)
     const [userEmail, setUserEmail] = useState<string>("")
 
     const supabase = createClient()
 
-    // Check authentication provider
     useEffect(() => {
-        const checkAuthProvider = async () => {
+        const getUserEmail = async () => {
             try {
                 const { data: { user } } = await supabase.auth.getUser()
-                if (user) {
-                    setUserEmail(user.email || "")
-                    // Check the provider from app_metadata or user metadata
-                    const provider = user.app_metadata?.provider ||
-                                   user.identities?.[0]?.provider ||
-                                   'email'
-                    setAuthProvider(provider)
+                if (user?.email) {
+                    setUserEmail(user.email)
                 }
             } catch (error) {
                 console.error('Error fetching user:', error)
             }
         }
 
-        checkAuthProvider()
-    }, [])
+        getUserEmail()
+    }, [supabase])
 
     const handlePasswordUpdate = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -119,27 +112,7 @@ export function SecurityTab() {
                 <div className="space-y-4 sm:space-y-5">
                     <h3 className="font-semibold text-gray-900 dark:text-gray-100 reading:text-amber-900 text-base sm:text-lg">Password</h3>
 
-                    {authProvider === 'google' ? (
-                        // Google Auth User
-                        <div className="p-5 bg-blue-50 dark:bg-blue-900/20 reading:bg-blue-100 border border-blue-200 dark:border-blue-800 reading:border-blue-300 rounded-xl">
-                            <div className="flex items-start gap-3">
-                                <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                                <div>
-                                    <h4 className="font-medium text-blue-900 dark:text-blue-200 reading:text-blue-900 mb-1">
-                                        Connected with Google
-                                    </h4>
-                                    <p className="text-sm text-blue-700 dark:text-blue-300 reading:text-blue-800">
-                                        Your account is authenticated through Google. Password management is handled by your Google account.
-                                    </p>
-                                    <p className="text-xs text-blue-600 dark:text-blue-400 reading:text-blue-700 mt-2">
-                                        To change your password, please visit your Google Account settings.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        // Email Auth User - Show Password Form
-                        <form onSubmit={handlePasswordUpdate} className="space-y-4 sm:space-y-5">
+                    <form onSubmit={handlePasswordUpdate} className="space-y-4 sm:space-y-5">
                             {message && (
                                 <div className={`p-4 rounded-xl flex items-start gap-3 ${
                                     message.type === 'success'
@@ -266,7 +239,6 @@ export function SecurityTab() {
                                 {loading ? 'Updating...' : 'Update Password'}
                             </Button>
                         </form>
-                    )}
                 </div>
 
                 {/* Active Sessions Section */}
@@ -277,7 +249,7 @@ export function SecurityTab() {
                             <div className="flex-1">
                                 <div className="font-medium text-gray-900 dark:text-gray-100 reading:text-amber-900 text-sm sm:text-base">Current Session</div>
                                 <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 reading:text-amber-700 mt-1">
-                                    {authProvider === 'google' ? 'Authenticated via Google' : 'Email Authentication'}
+                                    Email Authentication
                                 </div>
                                 <div className="text-xs text-gray-400 dark:text-gray-500 reading:text-amber-600 mt-0.5">Last active: Now</div>
                             </div>
