@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -69,7 +69,7 @@ interface SessionParticipant {
   rank: number
 }
 
-export default function LeaderboardPage() {
+function LeaderboardContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session')
 
@@ -772,5 +772,20 @@ export default function LeaderboardPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function LeaderboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-black">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary dark:text-cyan-500 reading:text-orange-500 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading leaderboard...</p>
+        </div>
+      </div>
+    }>
+      <LeaderboardContent />
+    </Suspense>
   )
 }
