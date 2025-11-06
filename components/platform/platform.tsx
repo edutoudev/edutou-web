@@ -10,6 +10,21 @@ export function Platform() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [sidebarWidth, setSidebarWidth] = useState(256)
+  const [isMounted, setIsMounted] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(false)
+
+  // Handle hydration and check if desktop
+  useEffect(() => {
+    setIsMounted(true)
+    setIsDesktop(window.innerWidth >= 768)
+
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 768)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Load sidebar width from localStorage on mount
   useEffect(() => {
@@ -46,7 +61,7 @@ export function Platform() {
       <div
         className={cn("min-h-screen transition-all duration-300 ease-in-out")}
         style={{
-          marginLeft: typeof window !== 'undefined' && window.innerWidth >= 768 && sidebarOpen ? `${sidebarWidth}px` : '0px'
+          marginLeft: isMounted && isDesktop && sidebarOpen ? `${sidebarWidth}px` : '0px'
         }}
       >
         <Header

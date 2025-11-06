@@ -1,7 +1,6 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 
 export async function login(formData: FormData) {
@@ -15,39 +14,61 @@ export async function login(formData: FormData) {
   const { data: authData, error } = await supabase.auth.signInWithPassword(data)
 
   if (error) {
-    throw new Error(error.message)
+    return { error: error.message }
   }
 
   if (!authData.user) {
-    throw new Error('Failed to authenticate user')
+    return { error: 'Failed to authenticate user' }
   }
 
-  // Fetch user role from profiles table
+  // Update profile with last login time and fetch role
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role')
+    .update({
+      last_login_at: new Date().toISOString(),
+      email: authData.user.email, // Update email in case it changed
+    })
     .eq('id', authData.user.id)
+    .select('role')
     .single()
 
   if (profileError) {
-    console.error('Error fetching profile:', profileError)
-    // If profile fetch fails, redirect to default home
+    console.error('Error updating profile on login:', profileError)
+    // If profile doesn't exist or update fails, try to fetch it
+    const { data: fetchedProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', authData.user.id)
+      .single()
+
+    if (!fetchedProfile) {
+      // Profile doesn't exist, create it
+      await supabase
+        .from('profiles')
+        .insert({
+          id: authData.user.id,
+          email: authData.user.email,
+          full_name: authData.user.user_metadata?.full_name || '',
+          role: 'student',
+          last_login_at: new Date().toISOString(),
+        })
+    }
+
     revalidatePath('/', 'layout')
-    redirect('/')
+    return { success: true, redirectTo: '/' }
   }
 
   revalidatePath('/', 'layout')
 
-  // Redirect based on role
+  // Return redirect path based on role
   const role = profile?.role?.toLowerCase()
 
   if (role === 'mentor') {
-    redirect('/mentor')
+    return { success: true, redirectTo: '/mentor' }
   } else if (role === 'admin') {
-    redirect('/admin')
+    return { success: true, redirectTo: '/admin' }
   } else {
-    // Default redirect for student or null role
-    redirect('/')
+    return { success: true, redirectTo: '/' }
   }
 }
 
@@ -59,6 +80,7 @@ export async function signup(formData: FormData) {
   const fullName = formData.get('name') as string
 
   // Sign up the user without email confirmation
+  // The database trigger (on_auth_user_created) will automatically create a profile
   const { data: authData, error: signUpError } = await supabase.auth.signUp({
     email,
     password,
@@ -72,77 +94,72 @@ export async function signup(formData: FormData) {
   })
 
   if (signUpError) {
-    throw new Error(signUpError.message)
+    return { error: signUpError.message }
   }
 
   if (!authData.user) {
-    throw new Error('Failed to create user')
+    return { error: 'Failed to create user' }
   }
 
-  // Try to fetch the profile, if it doesn't exist, create it
-  let profile = null
-  let attempts = 0
-  const maxAttempts = 3
+  // Wait a moment for the database trigger to create the profile
+  await new Promise(resolve => setTimeout(resolve, 500))
 
-  while (attempts < maxAttempts && !profile) {
-    // Wait a bit for the database trigger to create the profile
-    if (attempts > 0) {
-      await new Promise(resolve => setTimeout(resolve, 500))
-    }
+  // Update the auto-created profile with last_login_at and full data
+  const { data: profile, error: updateError } = await supabase
+    .from('profiles')
+    .update({
+      full_name: fullName,
+      email: email,
+      last_login_at: new Date().toISOString(),
+    })
+    .eq('id', authData.user.id)
+    .select('role')
+    .single()
 
-    const { data: fetchedProfile, error: profileError } = await supabase
+  if (updateError) {
+    console.error('Error updating profile after signup:', updateError)
+
+    // If update failed, profile might not exist yet, try to create it manually
+    const { data: createdProfile, error: insertError } = await supabase
       .from('profiles')
+      .insert({
+        id: authData.user.id,
+        email: email,
+        full_name: fullName,
+        role: 'student',
+        last_login_at: new Date().toISOString(),
+      })
       .select('role')
-      .eq('id', authData.user.id)
       .single()
 
-    if (!profileError && fetchedProfile) {
-      profile = fetchedProfile
-      break
+    if (insertError) {
+      console.error('Error creating profile manually:', insertError)
+      revalidatePath('/', 'layout')
+      return { success: true, redirectTo: '/' }
     }
 
-    // If profile doesn't exist (PGRST116 error), create it manually
-    if (profileError && profileError.code === 'PGRST116') {
-      const { data: createdProfile, error: createError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          email: authData.user.email,
-          full_name: fullName,
-          role: 'student', // Default role
-        })
-        .select('role')
-        .single()
-
-      if (!createError && createdProfile) {
-        profile = createdProfile
-        break
-      } else {
-        console.error('Error creating profile:', createError)
-      }
-    }
-
-    attempts++
-  }
-
-  // If still no profile after all attempts, redirect to home with default student role
-  if (!profile) {
-    console.error('Could not fetch or create profile after multiple attempts')
     revalidatePath('/', 'layout')
-    redirect('/')
+    const role = createdProfile?.role?.toLowerCase()
+
+    if (role === 'mentor') {
+      return { success: true, redirectTo: '/mentor' }
+    } else if (role === 'admin') {
+      return { success: true, redirectTo: '/admin' }
+    } else {
+      return { success: true, redirectTo: '/' }
+    }
   }
 
   revalidatePath('/', 'layout')
 
-  // Redirect based on role
+  // Return redirect path based on role
   const role = profile?.role?.toLowerCase()
 
   if (role === 'mentor') {
-    redirect('/mentor')
+    return { success: true, redirectTo: '/mentor' }
   } else if (role === 'admin') {
-    redirect('/admin')
+    return { success: true, redirectTo: '/admin' }
   } else {
-    // Default redirect for student or null role
-    redirect('/')
+    return { success: true, redirectTo: '/' }
   }
 }
