@@ -58,7 +58,7 @@ export async function signup(formData: FormData) {
   const password = formData.get('password') as string
   const fullName = formData.get('name') as string
 
-  // Sign up the user
+  // Sign up the user without email confirmation
   const { data: authData, error: signUpError } = await supabase.auth.signUp({
     email,
     password,
@@ -66,7 +66,8 @@ export async function signup(formData: FormData) {
       data: {
         full_name: fullName,
       },
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      // Disable email confirmation
+      emailRedirectTo: undefined,
     }
   })
 
@@ -78,17 +79,55 @@ export async function signup(formData: FormData) {
     throw new Error('Failed to create user')
   }
 
-  // The profile will be automatically created by the database trigger
-  // Fetch user role from profiles table
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', authData.user.id)
-    .single()
+  // Try to fetch the profile, if it doesn't exist, create it
+  let profile = null
+  let attempts = 0
+  const maxAttempts = 3
 
-  if (profileError) {
-    console.error('Error fetching profile:', profileError)
-    // If profile fetch fails, redirect to default home
+  while (attempts < maxAttempts && !profile) {
+    // Wait a bit for the database trigger to create the profile
+    if (attempts > 0) {
+      await new Promise(resolve => setTimeout(resolve, 500))
+    }
+
+    const { data: fetchedProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', authData.user.id)
+      .single()
+
+    if (!profileError && fetchedProfile) {
+      profile = fetchedProfile
+      break
+    }
+
+    // If profile doesn't exist (PGRST116 error), create it manually
+    if (profileError && profileError.code === 'PGRST116') {
+      const { data: createdProfile, error: createError } = await supabase
+        .from('profiles')
+        .insert({
+          id: authData.user.id,
+          email: authData.user.email,
+          full_name: fullName,
+          role: 'student', // Default role
+        })
+        .select('role')
+        .single()
+
+      if (!createError && createdProfile) {
+        profile = createdProfile
+        break
+      } else {
+        console.error('Error creating profile:', createError)
+      }
+    }
+
+    attempts++
+  }
+
+  // If still no profile after all attempts, redirect to home with default student role
+  if (!profile) {
+    console.error('Could not fetch or create profile after multiple attempts')
     revalidatePath('/', 'layout')
     redirect('/')
   }
