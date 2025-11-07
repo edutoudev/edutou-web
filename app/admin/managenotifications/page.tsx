@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
-interface Notification {
+interface BroadcastNotification {
   id: string
   title: string
   message: string
@@ -33,7 +33,7 @@ interface Notification {
 export default function AdminManageNotifications() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [broadcasts, setBroadcasts] = useState<BroadcastNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -48,7 +48,7 @@ export default function AdminManageNotifications() {
 
   useEffect(() => {
     checkAccess()
-    fetchNotifications()
+    fetchBroadcasts()
   }, [])
 
   const checkAccess = async () => {
@@ -69,27 +69,27 @@ export default function AdminManageNotifications() {
     }
   }
 
-  const fetchNotifications = async () => {
+  const fetchBroadcasts = async () => {
     try {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
       const { data, error } = await supabase
-        .from('notifications')
+        .from('broadcast_notifications')
         .select('*')
         .eq('created_by', user.id)
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('Error fetching notifications:', error)
-        setNotifications([])
+        console.error('Error fetching broadcasts:', error)
+        setBroadcasts([])
       } else {
-        setNotifications(data || [])
+        setBroadcasts(data || [])
       }
     } catch (error) {
       console.error('Error:', error)
-      setNotifications([])
+      setBroadcasts([])
     } finally {
       setLoading(false)
     }
@@ -103,58 +103,88 @@ export default function AdminManageNotifications() {
 
     try {
       setSending(true)
+
+      // Get current user
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { error } = await supabase
-        .from('notifications')
-        .insert({
-          title: newNotification.title.trim(),
-          message: newNotification.message.trim(),
-          created_by: user.id,
-          created_by_role: 'admin',
-          target_audience: 'all_students',
-        })
-
-      if (error) {
-        console.error('Error sending notification:', error)
-        alert('Failed to send notification')
+      if (!user) {
+        alert('You must be logged in to send notifications')
         return
       }
 
-      alert('Notification sent successfully!')
+      // Get user profile to verify role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile || !['admin', 'mentor', 'coursemaster'].includes(profile.role)) {
+        alert('Only admins and mentors can send broadcasts')
+        return
+      }
+
+      console.log('Creating broadcast notification...')
+
+      // Insert into broadcast_notifications table
+      // The database trigger will automatically send to all students
+      const { data, error } = await supabase
+        .from('broadcast_notifications')
+        .insert({
+          title: newNotification.title.trim(),
+          message: newNotification.message.trim(),
+          target_audience: 'all_students',
+          created_by: user.id,
+          created_by_role: profile.role,
+        })
+        .select()
+
+      if (error) {
+        console.error('Database error:', error)
+        alert(`Failed to send broadcast: ${error.message}`)
+        return
+      }
+
+      console.log('Broadcast created:', data)
+
+      // Count how many students will receive it
+      const { count } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'student')
+
+      alert(`✅ Broadcast sent successfully to ${count || 0} student(s)!`)
       setNewNotification({ title: '', message: '' })
-      await fetchNotifications()
+      await fetchBroadcasts()
     } catch (error) {
-      console.error('Error:', error)
-      alert('Failed to send notification')
+      console.error('Error sending broadcast:', error)
+      alert('Failed to send broadcast: ' + String(error))
     } finally {
       setSending(false)
     }
   }
 
-  const handleDeleteNotification = async (id: string) => {
-    const confirmed = window.confirm('Are you sure you want to delete this notification?')
+  const handleDeleteBroadcast = async (id: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this broadcast? This will also delete all user notifications associated with it.')
     if (!confirmed) return
 
     try {
       setDeletingId(id)
 
       const { error } = await supabase
-        .from('notifications')
+        .from('broadcast_notifications')
         .delete()
         .eq('id', id)
 
       if (error) {
-        console.error('Error deleting notification:', error)
-        alert('Failed to delete notification')
+        console.error('Error deleting broadcast:', error)
+        alert('Failed to delete broadcast')
         return
       }
 
-      await fetchNotifications()
+      await fetchBroadcasts()
     } catch (error) {
       console.error('Error:', error)
-      alert('Failed to delete notification')
+      alert('Failed to delete broadcast')
     } finally {
       setDeletingId(null)
     }
@@ -245,14 +275,14 @@ export default function AdminManageNotifications() {
             </CardContent>
           </Card>
 
-          {/* Sent Notifications */}
+          {/* Sent Broadcasts */}
           <Card className="border-none shadow-lg rounded-2xl">
             <CardHeader>
               <CardTitle className="text-gray-900 dark:text-gray-100 reading:text-amber-900">
-                Sent Notifications ({notifications.length})
+                Sent Broadcasts ({broadcasts.length})
               </CardTitle>
               <CardDescription className="text-gray-600 dark:text-gray-400 reading:text-amber-700">
-                View all notifications you've sent
+                View all broadcasts you've sent
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -260,47 +290,48 @@ export default function AdminManageNotifications() {
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                 </div>
-              ) : notifications.length === 0 ? (
+              ) : broadcasts.length === 0 ? (
                 <div className="text-center py-12">
                   <Bell className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                   <p className="text-gray-600 dark:text-gray-400 reading:text-amber-700">
-                    No notifications sent yet
+                    No broadcasts sent yet
                   </p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {notifications.map((notification) => (
+                  {broadcasts.map((broadcast) => (
                     <div
-                      key={notification.id}
+                      key={broadcast.id}
                       className="p-4 rounded-xl border-2 border-gray-200 dark:border-slate-700 reading:border-amber-300 bg-white dark:bg-slate-800 reading:bg-amber-50 hover:border-blue-300 dark:hover:border-blue-700 transition-all"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-2">
                             <h3 className="font-semibold text-gray-900 dark:text-gray-100 reading:text-amber-900">
-                              {notification.title}
+                              {broadcast.title}
                             </h3>
                             <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 reading:bg-blue-200">
-                              All Students
+                              {broadcast.target_audience === 'all_students' ? 'All Students' :
+                               broadcast.target_audience === 'all_mentors' ? 'All Mentors' : 'All Users'}
                             </Badge>
                           </div>
                           <p className="text-gray-600 dark:text-gray-400 reading:text-amber-700 text-sm mb-2">
-                            {notification.message}
+                            {broadcast.message}
                           </p>
                           <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-500 reading:text-amber-600">
                             <Calendar className="h-3 w-3" />
-                            {new Date(notification.created_at).toLocaleDateString()} at{' '}
-                            {new Date(notification.created_at).toLocaleTimeString()}
+                            {new Date(broadcast.created_at).toLocaleDateString()} at{' '}
+                            {new Date(broadcast.created_at).toLocaleTimeString()}
                           </div>
                         </div>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteNotification(notification.id)}
-                          disabled={deletingId === notification.id}
+                          onClick={() => handleDeleteBroadcast(broadcast.id)}
+                          disabled={deletingId === broadcast.id}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl"
                         >
-                          {deletingId === notification.id ? (
+                          {deletingId === broadcast.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
                             <Trash2 className="h-4 w-4" />

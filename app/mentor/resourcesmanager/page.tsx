@@ -238,24 +238,31 @@ export default function ResourcesManagerPage() {
       }
 
       // Save metadata to database
+      const resourceData = {
+        file_name: fileName,
+        file_url: publicUrl,
+        file_type: fileType,
+        file_size: fileSize,
+        uploaded_by: currentUserId,
+        tags: tags,
+        description: description.trim() || null,
+        text_content: textContent.trim() || null,
+      }
+
+      console.log('Inserting resource data:', resourceData)
+
       const { error: dbError } = await supabase
         .from('resources')
-        .insert({
-          file_name: fileName,
-          file_url: publicUrl,
-          file_type: fileType,
-          file_size: fileSize,
-          uploaded_by: currentUserId,
-          tags: tags,
-          description: description.trim() || null,
-          text_content: textContent.trim() || null,
-        })
+        .insert(resourceData)
 
       if (dbError) {
         console.error('Database error:', dbError)
+        console.error('Error details:', JSON.stringify(dbError, null, 2))
+        console.error('Error message:', dbError.message)
+        console.error('Error code:', dbError.code)
         toast({
           title: "Database error",
-          description: selectedFile ? "File uploaded but failed to save metadata" : "Failed to save resource",
+          description: dbError.message || (selectedFile ? "File uploaded but failed to save metadata" : "Failed to save resource"),
           variant: "destructive",
         })
         return

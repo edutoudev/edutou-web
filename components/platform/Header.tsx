@@ -26,6 +26,7 @@ interface Notification {
   created_at: string
   created_by: string
   created_by_role: string
+  is_read?: boolean
 }
 
 export function Header({ sidebarOpen, setSidebarOpen, setMobileMenuOpen }: {
@@ -87,102 +88,95 @@ export function Header({ sidebarOpen, setSidebarOpen, setMobileMenuOpen }: {
   useEffect(() => {
     if (!user || userRole !== 'student') return
 
-    console.log('Setting up real-time notifications for student:', user.id)
+    console.log('🔔 Setting up real-time notifications for student:', user.id)
 
-    // Get mentor_id for filtering from mentor_assignments table
-    const getMentorId = async () => {
-      const { data: assignment } = await supabase
-        .from('mentor_assignments')
-        .select('mentor_id')
-        .eq('student_id', user.id)
-        .eq('status', 'active')
-        .single()
+    // Set up real-time subscription to user_notifications table (filtered by user_id)
+    const channel = supabase
+      .channel('user-notifications-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'user_notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('🔔 Received new notification in real-time:', payload)
+          const newNotification = payload.new as any
 
-      const mentorId = assignment?.mentor_id
-
-      // Set up real-time subscription
-      const channel = supabase
-        .channel('notifications-realtime', {
-          config: {
-            broadcast: { self: true },
-          },
-        })
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'notifications',
-          },
-          (payload) => {
-            console.log('Received notification:', payload)
-            const newNotification = payload.new as Notification
-
-            // Check if this notification is for the current student
-            const shouldReceive =
-              (newNotification.created_by_role === 'admin' &&
-                newNotification.target_audience === 'all_students') ||
-              (newNotification.created_by_role === 'mentor' &&
-                newNotification.target_audience === 'mentor_students' &&
-                newNotification.mentor_id === mentorId)
-
-            if (shouldReceive) {
-              console.log('Adding notification to list')
-              // Add to bell list
-              setNotifications((prev) => [newNotification, ...prev.slice(0, 9)])
-              // Increment unread count
-              setUnreadCount((prev) => prev + 1)
-            }
+          const notification: Notification = {
+            id: newNotification.id,
+            title: newNotification.title,
+            message: newNotification.message,
+            created_by: newNotification.created_by,
+            created_by_role: newNotification.created_by_role,
+            created_at: newNotification.created_at,
+            is_read: false,
           }
-        )
-        .subscribe((status) => {
-          console.log('Subscription status:', status)
-        })
 
-      // Clean up subscription
-      return () => {
-        console.log('Unsubscribing from notifications')
-        supabase.removeChannel(channel)
-      }
-    }
+          console.log('✅ Adding notification to list:', notification)
 
-    const cleanup = getMentorId()
+          // Add to bell list (keep only last 10)
+          setNotifications((prev) => [notification, ...prev.slice(0, 9)])
+          // Increment unread count
+          setUnreadCount((prev) => prev + 1)
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Real-time subscription status:', status)
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to notifications!')
+        }
+      })
+
+    // Clean up subscription
     return () => {
-      cleanup.then((cleanupFn) => cleanupFn?.())
+      console.log('🔌 Unsubscribing from notifications')
+      supabase.removeChannel(channel)
     }
-  }, [user, userRole])
+  }, [user, userRole, supabase])
 
   const fetchNotifications = async (userId: string) => {
     try {
       setLoadingNotifications(true)
+      console.log('📥 Fetching notifications for user:', userId)
 
-      // Fetch notifications
+      // Fetch user's notifications directly from user_notifications table
       const { data: notificationsData, error: notifError } = await supabase
-        .from('notifications')
+        .from('user_notifications')
         .select('*')
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(10)
 
       if (notifError) {
-        console.error('Error fetching notifications:', notifError)
+        console.error('❌ Error fetching notifications:', notifError)
+        console.error('Error details:', JSON.stringify(notifError, null, 2))
         return
       }
 
-      setNotifications(notificationsData || [])
+      console.log(`✅ Fetched ${notificationsData?.length || 0} notifications`)
 
-      // Fetch read notifications
-      const { data: readData, error: readError } = await supabase
-        .from('notification_reads')
-        .select('notification_id')
-        .eq('user_id', userId)
+      // Transform the data to match the Notification interface
+      const transformedNotifications = (notificationsData || []).map((n: any) => ({
+        id: n.id,
+        title: n.title,
+        message: n.message,
+        created_by: n.created_by,
+        created_by_role: n.created_by_role,
+        created_at: n.created_at,
+        is_read: n.is_read,
+      }))
 
-      if (!readError) {
-        const readIds = new Set(readData?.map(r => r.notification_id) || [])
-        const unread = notificationsData?.filter(n => !readIds.has(n.id)).length || 0
-        setUnreadCount(unread)
-      }
+      setNotifications(transformedNotifications)
+
+      // Count unread notifications
+      const unread = transformedNotifications.filter((n: any) => !n.is_read).length
+      console.log(`🔔 Unread count: ${unread}`)
+      setUnreadCount(unread)
     } catch (error) {
-      console.error('Error:', error)
+      console.error('❌ Error:', error)
     } finally {
       setLoadingNotifications(false)
     }
@@ -192,18 +186,32 @@ export function Header({ sidebarOpen, setSidebarOpen, setMobileMenuOpen }: {
     if (!user) return
 
     try {
+      // Update the user_notification record to mark as read
       const { error } = await supabase
-        .from('notification_reads')
-        .insert({
-          notification_id: notificationId,
-          user_id: user.id,
+        .from('user_notifications')
+        .update({
+          is_read: true,
+          read_at: new Date().toISOString(),
         })
+        .eq('id', notificationId)
+        .eq('user_id', user.id)
 
       if (!error) {
+        console.log('✅ Marked notification as read:', notificationId)
+        // Update local state
+        setNotifications(prev =>
+          prev.map(n =>
+            n.id === notificationId
+              ? { ...n, is_read: true } as any
+              : n
+          )
+        )
         setUnreadCount(prev => Math.max(0, prev - 1))
+      } else {
+        console.error('❌ Error marking as read:', error)
       }
     } catch (error) {
-      console.error('Error marking notification as read:', error)
+      console.error('❌ Error marking notification as read:', error)
     }
   }
 
@@ -318,13 +326,20 @@ export function Header({ sidebarOpen, setSidebarOpen, setMobileMenuOpen }: {
                     notifications.map((notification) => (
                       <DropdownMenuItem
                         key={notification.id}
-                        className="cursor-pointer p-4 flex-col items-start"
+                        className={`cursor-pointer p-4 flex-col items-start ${!notification.is_read ? 'bg-blue-50 dark:bg-blue-950/20' : ''}`}
                         onClick={() => markAsRead(notification.id)}
                       >
                         <div className="flex items-start gap-2 w-full">
-                          <Bell className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-500" />
+                          <Bell className={`h-4 w-4 mt-0.5 flex-shrink-0 ${!notification.is_read ? 'text-blue-500' : 'text-muted-foreground'}`} />
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm mb-1">{notification.title}</p>
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className={`text-sm ${!notification.is_read ? 'font-semibold' : 'font-medium'}`}>
+                                {notification.title}
+                              </p>
+                              {!notification.is_read && (
+                                <span className="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0" />
+                              )}
+                            </div>
                             <p className="text-xs text-muted-foreground line-clamp-2">
                               {notification.message}
                             </p>

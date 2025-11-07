@@ -142,13 +142,7 @@ function ThreadCard({ thread, onVote, currentUserId, onCommentAdded, onThreadCli
     try {
       const { data, error } = await supabase
         .from('discussion_comments')
-        .select(`
-          *,
-          profiles:user_id (
-            full_name,
-            email
-          )
-        `)
+        .select('*')
         .eq('discussion_id', thread.id)
         .order('created_at', { ascending: true })
 
@@ -157,11 +151,22 @@ function ThreadCard({ thread, onVote, currentUserId, onCommentAdded, onThreadCli
         return
       }
 
-      const commentsWithAuth = (data || []).map((comment: any) => ({
-        ...comment,
-        author_name: comment.profiles?.full_name || null,
-        author_email: comment.profiles?.email || null,
-      }))
+      // Fetch author profiles for each comment
+      const commentsWithAuth = await Promise.all(
+        (data || []).map(async (comment: any) => {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', comment.user_id)
+            .single()
+
+          return {
+            ...comment,
+            author_name: profileData?.full_name || null,
+            author_email: profileData?.email || null,
+          }
+        })
+      )
 
       setComments(commentsWithAuth)
     } catch (err) {
@@ -207,15 +212,20 @@ function ThreadCard({ thread, onVote, currentUserId, onCommentAdded, onThreadCli
         return
       }
 
-      // Award points for commenting on discussion
+      // Award points for commenting on discussion (don't fail if points system fails)
       if (data) {
-        await awardPoints({
-          userId: currentUserId,
-          actionType: 'discussion_comment',
-          referenceId: data.id,
-          referenceType: 'discussion_comment',
-          description: `Commented on: ${thread.title}`
-        })
+        try {
+          await awardPoints({
+            userId: currentUserId,
+            actionType: 'discussion_comment',
+            referenceId: data.id,
+            referenceType: 'discussion_comment',
+            description: `Commented on: ${thread.title}`
+          })
+        } catch (pointsError) {
+          console.warn('Failed to award points:', pointsError)
+          // Continue anyway - points are optional
+        }
       }
 
       setNewComment('')
@@ -512,15 +522,20 @@ function CreateThreadModal({ onThreadCreated, isOpen: externalIsOpen, setIsOpen:
         return
       }
 
-      // Award points for creating a discussion
+      // Award points for creating a discussion (don't fail if points system fails)
       if (data) {
-        await awardPoints({
-          userId: user.id,
-          actionType: 'discussion_create',
-          referenceId: data.id,
-          referenceType: 'discussion',
-          description: `Created discussion: ${title.trim()}`
-        })
+        try {
+          await awardPoints({
+            userId: user.id,
+            actionType: 'discussion_create',
+            referenceId: data.id,
+            referenceType: 'discussion',
+            description: `Created discussion: ${title.trim()}`
+          })
+        } catch (pointsError) {
+          console.warn('Failed to award points:', pointsError)
+          // Continue anyway - points are optional
+        }
       }
 
       // Reset form
@@ -790,16 +805,10 @@ export default function DiscussionPage() {
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUserId(user?.id || null)
 
-      // Fetch discussions with author info and comment count
+      // Fetch discussions
       const { data: discussionsData, error } = await supabase
         .from('discussions')
-        .select(`
-          *,
-          profiles:user_id (
-            full_name,
-            email
-          )
-        `)
+        .select('*')
         .order('is_pinned', { ascending: false })
         .order('created_at', { ascending: false })
 
@@ -808,13 +817,21 @@ export default function DiscussionPage() {
         return
       }
 
-      // Get comment counts for each discussion
+      // Get comment counts, user profiles, and votes for each discussion
       const discussionsWithCounts = await Promise.all(
         (discussionsData || []).map(async (discussion) => {
+          // Get comment count
           const { count } = await supabase
             .from('discussion_comments')
             .select('*', { count: 'exact', head: true })
             .eq('discussion_id', discussion.id)
+
+          // Get author profile
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', discussion.user_id)
+            .single()
 
           // Get user's vote if logged in
           let userVote = null
@@ -824,15 +841,15 @@ export default function DiscussionPage() {
               .select('vote_type')
               .eq('discussion_id', discussion.id)
               .eq('user_id', user.id)
-              .single()
+              .maybeSingle()
 
             userVote = voteData?.vote_type || null
           }
 
           return {
             ...discussion,
-            author_name: discussion.profiles?.full_name || null,
-            author_email: discussion.profiles?.email || null,
+            author_name: profileData?.full_name || null,
+            author_email: profileData?.email || null,
             comment_count: count || 0,
             user_vote: userVote,
           }
