@@ -82,3 +82,26 @@ export async function signup(formData: FormData) {
   // The profile will be automatically created by the database trigger
   await redirectByRole(authData.user.id, supabase)
 }
+
+export async function signInWithGoogle() {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      },
+    },
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  if (data.url) {
+    redirect(data.url)
+  }
+}
