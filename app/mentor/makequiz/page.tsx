@@ -856,7 +856,7 @@ export default function MakeQuizPage() {
                         {/* Actions */}
                         <div className="flex flex-col gap-2 pt-2">
                           {savedQuiz.status === 'draft' ? (
-                            // Draft Actions: Edit, Go Live, Delete
+                            // Draft Actions: Edit, Delete, Go Live, Start Live Session
                             <>
                               <div className="flex gap-2">
                                 <Button
@@ -897,7 +897,7 @@ export default function MakeQuizPage() {
                                 {republishingId === savedQuiz.id ? (
                                   <>
                                     <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                                    Going Live...
+                                    Publishing...
                                   </>
                                 ) : (
                                   <>
@@ -906,9 +906,17 @@ export default function MakeQuizPage() {
                                   </>
                                 )}
                               </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => router.push(`/mentor/quiz/${savedQuiz.id}/start-live`)}
+                                className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                              >
+                                <Play className="mr-2 h-3 w-3" />
+                                Start Live Session
+                              </Button>
                             </>
                           ) : (
-                            // Published Actions: Edit, Start Live Session, Republish
+                            // Published Actions: Edit, Republish, Start Live Session
                             <>
                               <div className="flex gap-2">
                                 <Button
@@ -942,7 +950,7 @@ export default function MakeQuizPage() {
                               <Button
                                 size="sm"
                                 onClick={() => router.push(`/mentor/quiz/${savedQuiz.id}/start-live`)}
-                                className="w-full rounded-xl bg-gradient-to-r from-slate-700 via-blue-600 to-indigo-600 hover:from-slate-800 hover:via-blue-700 hover:to-indigo-700 text-white"
+                                className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
                               >
                                 <Play className="mr-2 h-3 w-3" />
                                 Start Live Session
