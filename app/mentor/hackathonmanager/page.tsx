@@ -91,31 +91,36 @@ export default function HackathonManagerPage() {
           // Fetch team members
           const { data: membersData } = await supabase
             .from('hackathon_team_members')
-            .select(`
-              *,
-              profiles:user_id (
-                full_name,
-                email
-              )
-            `)
+            .select('*')
             .eq('team_id', team.id)
             .order('joined_at', { ascending: true })
 
-          const members: TeamMember[] = (membersData || []).map((m: any) => ({
-            id: m.id,
-            user_id: m.user_id,
-            joined_at: m.joined_at,
-            full_name: m.profiles?.full_name || null,
-            email: m.profiles?.email || null,
-          }))
+          // Fetch profile data for each member separately
+          const membersWithProfiles = await Promise.all(
+            (membersData || []).map(async (m: any) => {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('full_name, email')
+                .eq('id', m.user_id)
+                .single()
+
+              return {
+                id: m.id,
+                user_id: m.user_id,
+                joined_at: m.joined_at,
+                full_name: profile?.full_name || null,
+                email: profile?.email || null,
+              }
+            })
+          )
 
           // Get leader info
-          const leader = members.find(m => m.user_id === team.leader_id)
+          const leader = membersWithProfiles.find(m => m.user_id === team.leader_id)
 
           return {
             ...team,
-            member_count: members.length,
-            members,
+            member_count: membersWithProfiles.length,
+            members: membersWithProfiles,
             leader_name: leader?.full_name || null,
             leader_email: leader?.email || null,
           }
