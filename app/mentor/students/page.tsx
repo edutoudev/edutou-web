@@ -32,7 +32,7 @@ interface Feedback {
   title?: string;
   message: string;
   created_at: string;
-  student_name: string;
+  feedback_type: 'platform' | 'mentor' | 'program';
 }
 
 export default function MentorStudentsPage() {
@@ -129,34 +129,20 @@ export default function MentorStudentsPage() {
 
       setStudents(studentsWithStats);
 
-      // Load feedback for this mentor
+      // Load all feedback from assigned students (platform, mentor, program)
       const { data: feedbackData, error: feedbackError } = await supabase
         .from('feedback')
-        .select('id, student_id, rating, title, message, created_at')
-        .eq('feedback_type', 'mentor')
-        .eq('mentor_id', user.id)
+        .select('id, student_id, rating, title, message, created_at, feedback_type')
+        .in('student_id', studentIds)
         .order('created_at', { ascending: false });
 
       if (feedbackError && feedbackError.code !== 'PGRST116' && feedbackError.code !== '42P01') {
         console.error('Feedback error:', feedbackError);
       }
 
-      // Get student names for feedback
+      // Set feedback without student names (anonymous)
       if (feedbackData && feedbackData.length > 0) {
-        const feedbackStudentIds = feedbackData.map(f => f.student_id);
-        const { data: students } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', feedbackStudentIds);
-
-        const studentMap = new Map((students || []).map(s => [s.id, s.full_name]));
-
-        const feedbackWithNames = feedbackData.map(f => ({
-          ...f,
-          student_name: studentMap.get(f.student_id) || 'Unknown'
-        }));
-
-        setMentorFeedback(feedbackWithNames);
+        setMentorFeedback(feedbackData);
       }
     } catch (error) {
       console.error('Error loading assigned students:', error);
@@ -315,6 +301,24 @@ export default function MentorStudentsPage() {
         ))}
       </div>
     );
+  };
+
+  const getFeedbackTypeBadge = (type: 'platform' | 'mentor' | 'program') => {
+    const config = {
+      platform: {
+        label: 'Platform',
+        className: 'bg-blue-500 hover:bg-blue-600 text-white'
+      },
+      mentor: {
+        label: 'Mentor',
+        className: 'bg-purple-500 hover:bg-purple-600 text-white'
+      },
+      program: {
+        label: 'Program',
+        className: 'bg-green-500 hover:bg-green-600 text-white'
+      }
+    };
+    return config[type];
   };
 
   if (loading) {
@@ -497,7 +501,7 @@ export default function MentorStudentsPage() {
                     Student Feedback
                   </CardTitle>
                   <CardDescription>
-                    Feedback from your students
+                    All feedback from your assigned students
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -508,30 +512,38 @@ export default function MentorStudentsPage() {
                         <p className="text-sm">No feedback yet</p>
                       </div>
                     ) : (
-                      mentorFeedback.map((feedback) => (
-                        <div
-                          key={feedback.id}
-                          className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-2"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                              {feedback.student_name}
-                            </span>
-                            {renderStars(feedback.rating)}
+                      mentorFeedback.map((feedback) => {
+                        const badgeConfig = getFeedbackTypeBadge(feedback.feedback_type);
+                        return (
+                          <div
+                            key={feedback.id}
+                            className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-2"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                  Anonymous Student
+                                </span>
+                                <Badge className={`${badgeConfig.className} text-xs`}>
+                                  {badgeConfig.label}
+                                </Badge>
+                              </div>
+                              {renderStars(feedback.rating)}
+                            </div>
+                            {feedback.title && (
+                              <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                                {feedback.title}
+                              </h4>
+                            )}
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {feedback.message}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(feedback.created_at).toLocaleDateString()}
+                            </p>
                           </div>
-                          {feedback.title && (
-                            <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                              {feedback.title}
-                            </h4>
-                          )}
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {feedback.message}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(feedback.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </CardContent>
