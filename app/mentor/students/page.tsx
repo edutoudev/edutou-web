@@ -22,10 +22,7 @@ interface AssignedStudent {
   assigned_at: string;
   created_at: string;
   stats?: {
-    quizzes_completed: number;
     total_points: number;
-    correct_answers: number;
-    total_attempts: number;
   };
 }
 
@@ -125,10 +122,7 @@ export default function MentorStudentsPage() {
           assigned_at: assignedAt,
           created_at: profile?.created_at || '',
           stats: stats ? {
-            quizzes_completed: stats.quizzes_completed || 0,
             total_points: stats.total_points || 0,
-            correct_answers: stats.correct_answers || 0,
-            total_attempts: stats.total_attempts || 0,
           } : undefined,
         };
       });
@@ -185,10 +179,7 @@ export default function MentorStudentsPage() {
           .maybeSingle();
 
         setStudentStats(stats || {
-          quizzes_completed: 0,
           total_points: 0,
-          correct_answers: 0,
-          total_attempts: 0,
         });
       } else {
         setStudentStats(student.stats);
@@ -228,6 +219,40 @@ export default function MentorStudentsPage() {
       });
 
       if (result.success) {
+        // Update leaderboard table
+        const { data: leaderboardEntry } = await supabase
+          .from('leaderboard')
+          .select('*')
+          .eq('user_id', selectedStudent.id)
+          .maybeSingle();
+
+        if (leaderboardEntry) {
+          // Update existing leaderboard entry
+          await supabase
+            .from('leaderboard')
+            .update({
+              total_points: (leaderboardEntry.total_points || 0) + actualPoints,
+              bonus_points: (leaderboardEntry.bonus_points || 0) + actualPoints,
+              last_activity: new Date().toISOString(),
+            })
+            .eq('user_id', selectedStudent.id);
+        } else {
+          // Create new leaderboard entry
+          await supabase
+            .from('leaderboard')
+            .insert({
+              user_id: selectedStudent.id,
+              total_points: actualPoints,
+              quiz_points: 0,
+              assignment_points: 0,
+              bonus_points: actualPoints,
+              quizzes_completed: 0,
+              correct_answers: 0,
+              total_attempts: 0,
+              last_activity: new Date().toISOString(),
+            });
+        }
+
         // Update local state
         const newPoints = selectedStudent.leaderboard_points + actualPoints;
         setSelectedStudent({
@@ -241,6 +266,14 @@ export default function MentorStudentsPage() {
             ? { ...s, leaderboard_points: newPoints }
             : s
         ));
+
+        // Update student stats if loaded
+        if (studentStats) {
+          setStudentStats({
+            ...studentStats,
+            total_points: (studentStats.total_points || 0) + actualPoints,
+          });
+        }
 
         alert(`Successfully ${operation === 'add' ? 'added' : 'subtracted'} ${pointsAmount} points!`);
       } else {
@@ -346,20 +379,6 @@ export default function MentorStudentsPage() {
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Total Quizzes</p>
-                        <p className="text-3xl font-bold text-green-600">
-                          {students.reduce((sum, s) => sum + (s.stats?.quizzes_completed || 0), 0)}
-                        </p>
-                      </div>
-                      <Target className="w-10 h-10 text-green-600" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">Total Points</p>
                         <p className="text-3xl font-bold text-purple-600">
                           {students.reduce((sum, s) => sum + (s.stats?.total_points || 0), 0).toLocaleString()}
@@ -405,9 +424,6 @@ export default function MentorStudentsPage() {
                 <div className="grid grid-cols-1 gap-4">
                   {filteredStudents.map((student) => {
                     const rank = getRankFromPoints(student.leaderboard_points);
-                    const accuracy = student.stats && student.stats.total_attempts > 0
-                      ? Math.round((student.stats.correct_answers / student.stats.total_attempts) * 100)
-                      : 0;
 
                     return (
                       <Card
@@ -443,32 +459,18 @@ export default function MentorStudentsPage() {
                                 </Badge>
                               </div>
 
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2">
-                                  <p className="text-xs text-blue-600 dark:text-blue-400">Points</p>
+                                  <p className="text-xs text-blue-600 dark:text-blue-400">Total Points</p>
                                   <p className="text-lg font-bold text-blue-900 dark:text-blue-100">
                                     {student.stats?.total_points.toLocaleString() || 0}
                                   </p>
                                 </div>
 
-                                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-2">
-                                  <p className="text-xs text-green-600 dark:text-green-400">Quizzes</p>
-                                  <p className="text-lg font-bold text-green-900 dark:text-green-100">
-                                    {student.stats?.quizzes_completed || 0}
-                                  </p>
-                                </div>
-
                                 <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-2">
-                                  <p className="text-xs text-purple-600 dark:text-purple-400">Accuracy</p>
+                                  <p className="text-xs text-purple-600 dark:text-purple-400">Leaderboard Points</p>
                                   <p className="text-lg font-bold text-purple-900 dark:text-purple-100">
-                                    {accuracy}%
-                                  </p>
-                                </div>
-
-                                <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-2">
-                                  <p className="text-xs text-orange-600 dark:text-orange-400">Correct</p>
-                                  <p className="text-lg font-bold text-orange-900 dark:text-orange-100">
-                                    {student.stats?.correct_answers || 0}/{student.stats?.total_attempts || 0}
+                                    {student.leaderboard_points.toLocaleString()}
                                   </p>
                                 </div>
                               </div>
@@ -593,26 +595,14 @@ export default function MentorStudentsPage() {
 
                 {/* Stats */}
                 {studentStats && (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Card>
                       <CardContent className="p-6">
                         <div className="text-center">
                           <Trophy className="w-8 h-8 text-purple-600 mx-auto mb-2" />
                           <p className="text-sm text-gray-600 dark:text-gray-400">Total Points</p>
                           <p className="text-2xl font-bold text-purple-600">
-                            {studentStats.total_points.toLocaleString()}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="text-center">
-                          <Target className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Quizzes</p>
-                          <p className="text-2xl font-bold text-green-600">
-                            {studentStats.quizzes_completed}
+                            {studentStats.total_points?.toLocaleString() || 0}
                           </p>
                         </div>
                       </CardContent>
@@ -622,23 +612,9 @@ export default function MentorStudentsPage() {
                       <CardContent className="p-6">
                         <div className="text-center">
                           <TrendingUp className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Accuracy</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Leaderboard Points</p>
                           <p className="text-2xl font-bold text-blue-600">
-                            {studentStats.total_attempts > 0
-                              ? Math.round((studentStats.correct_answers / studentStats.total_attempts) * 100)
-                              : 0}%
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="text-center">
-                          <Users className="w-8 h-8 text-orange-600 mx-auto mb-2" />
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Correct/Total</p>
-                          <p className="text-2xl font-bold text-orange-600">
-                            {studentStats.correct_answers}/{studentStats.total_attempts}
+                            {selectedStudent.leaderboard_points.toLocaleString()}
                           </p>
                         </div>
                       </CardContent>

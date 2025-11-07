@@ -39,9 +39,6 @@ interface LeaderboardEntry {
   quiz_points: number
   assignment_points: number
   bonus_points: number
-  quizzes_completed: number
-  correct_answers: number
-  total_attempts: number
   last_activity: string
   rank: number
   full_name: string | null
@@ -53,9 +50,6 @@ interface CurrentUserStats {
   rank: number
   total_points: number
   quiz_points: number
-  quizzes_completed: number
-  correct_answers: number
-  total_attempts: number
 }
 
 interface SessionParticipant {
@@ -142,9 +136,6 @@ function LeaderboardContent() {
         quiz_points: 0, // Will be populated if you have separate quiz tracking
         assignment_points: 0,
         bonus_points: 0,
-        quizzes_completed: 0,
-        correct_answers: 0,
-        total_attempts: 0,
         last_activity: entry.created_at,
         rank: index + 1,
         full_name: entry.full_name || null,
@@ -162,9 +153,6 @@ function LeaderboardContent() {
             rank: userEntry.rank,
             total_points: userEntry.total_points,
             quiz_points: userEntry.quiz_points,
-            quizzes_completed: userEntry.quizzes_completed,
-            correct_answers: userEntry.correct_answers,
-            total_attempts: userEntry.total_attempts,
           })
         }
       }
@@ -282,7 +270,7 @@ function LeaderboardContent() {
     return 'U'
   }
 
-  const getAccuracy = (correct: number, total: number): number => {
+  const getAccuracyDEPRECATED = (correct: number, total: number): number => {
     if (total === 0) return 0
     return Math.round((correct / total) * 100)
   }
@@ -301,20 +289,6 @@ function LeaderboardContent() {
       value: currentUser ? currentUser.total_points.toLocaleString() : '-',
       color: 'bg-blue-500/10 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 reading:bg-blue-100 reading:text-blue-700',
       iconColor: 'text-blue-600 dark:text-blue-400'
-    },
-    {
-      icon: CheckCircle,
-      label: 'Quizzes Completed',
-      value: currentUser ? currentUser.quizzes_completed.toString() : '-',
-      color: 'bg-green-500/10 text-green-600 dark:bg-green-900/20 dark:text-green-400 reading:bg-green-100 reading:text-green-700',
-      iconColor: 'text-green-600 dark:text-green-400'
-    },
-    {
-      icon: Target,
-      label: 'Accuracy',
-      value: currentUser ? `${getAccuracy(currentUser.correct_answers, currentUser.total_attempts)}%` : '-',
-      color: 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 reading:bg-emerald-100 reading:text-emerald-700',
-      iconColor: 'text-emerald-600 dark:text-emerald-400'
     },
   ]
 
@@ -567,9 +541,6 @@ function LeaderboardContent() {
                   <div className="space-y-2">
                     {sessionParticipants.map((participant, index) => {
                       const isTopThree = participant.rank <= 3
-                      const accuracy = participant.questions_answered > 0
-                        ? Math.round((participant.correct_answers / participant.questions_answered) * 100)
-                        : 0
 
                       return (
                         <motion.div
@@ -623,10 +594,6 @@ function LeaderboardContent() {
                                         <CheckCircle className="h-3 w-3" />
                                         {participant.correct_answers}/{participant.questions_answered} correct
                                       </div>
-                                      <div className="flex items-center gap-1">
-                                        <Target className="h-3 w-3" />
-                                        {accuracy}% accuracy
-                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -665,7 +632,6 @@ function LeaderboardContent() {
                     const rankInfo = getRankFromPoints(entry.total_points)
                     const displayName = entry.full_name || entry.email?.split('@')[0] || 'Anonymous'
                     const initials = getInitials(entry.full_name, entry.email)
-                    const accuracy = getAccuracy(entry.correct_answers, entry.total_attempts)
 
                     return (
                       <motion.div
@@ -730,16 +696,6 @@ function LeaderboardContent() {
                                       <span className="mr-1">{rankInfo.emoji}</span>
                                       {rankInfo.name}
                                     </Badge>
-                                  </div>
-                                  <div className="mt-1 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 reading:text-amber-700">
-                                    <div className="flex items-center gap-1">
-                                      <CheckCircle className="h-3 w-3" />
-                                      {entry.quizzes_completed} quizzes
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <Target className="h-3 w-3" />
-                                      {accuracy}% accuracy
-                                    </div>
                                   </div>
                                 </div>
                               </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { User as SupabaseUser } from '@supabase/supabase-js'
-import { User, Bell, Lock, CreditCard, Settings as SettingsIcon, Sparkles } from "lucide-react"
+import { User, Lock, Settings as SettingsIcon } from "lucide-react"
 
 import { Sidebar } from "@/components/sidebar"
 import { cn } from "@/lib/utils"
@@ -10,14 +10,11 @@ import { Header } from "@/components/platform/Header"
 import { createClient } from "@/utils/supabase/client"
 
 import { ProfileTab } from "./ProfileTab"
-import { NotificationsTab } from "./NotificationsTab"
-
 import { PreferencesTab } from "./PreferencesTab"
 import { SecurityTab } from "./SecurityTab"
 
 const settingsSections = [
   { id: "profile", label: "Profile", icon: User, description: "Manage your personal information" },
-  { id: "notifications", label: "Notifications", icon: Bell, description: "Configure notification preferences" },
   { id: "security", label: "Security", icon: Lock, description: "Password and authentication" },
   { id: "preferences", label: "Preferences", icon: SettingsIcon, description: "Application settings" },
 ]
@@ -28,16 +25,6 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("profile")
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [loading, setLoading] = useState(true)
-
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: false,
-    sms: false,
-    workflowSuccess: true,
-    workflowFailure: true,
-    weeklyReport: true,
-    securityAlerts: true,
-  })
 
   const supabase = createClient()
 
@@ -70,7 +57,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1)
-      const validTabs = ["profile", "notifications", "security", "billing", "preferences"]
+      const validTabs = ["profile", "security", "preferences"]
       if (hash && validTabs.includes(hash)) {
         setActiveTab(hash)
       }
@@ -87,16 +74,10 @@ export default function SettingsPage() {
     window.history.pushState(null, "", `#${value}`)
   }
 
-  const handleNotificationChange = (key: string, value: boolean) => {
-    setNotifications((prev) => ({ ...prev, [key]: value }))
-  }
-
   const renderContent = () => {
     switch (activeTab) {
       case "profile":
         return <ProfileTab />
-      case "notifications":
-        return <NotificationsTab notifications={notifications} handleNotificationChange={handleNotificationChange} />
       case "security":
         return <SecurityTab />
       case "preferences":

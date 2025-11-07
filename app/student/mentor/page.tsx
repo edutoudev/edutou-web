@@ -242,18 +242,10 @@ export default function StudentMentorPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Email</p>
-                  <a
-                    href={`mailto:${mentor.email}`}
-                    className="text-blue-600 dark:text-blue-400 hover:underline truncate block"
-                  >
+                  <p className="text-blue-600 dark:text-blue-400 truncate block">
                     {mentor.email}
-                  </a>
+                  </p>
                 </div>
-                <Button asChild size="sm">
-                  <a href={`mailto:${mentor.email}`}>
-                    Send Email
-                  </a>
-                </Button>
               </div>
 
               {/* Phone (if available) */}
@@ -278,39 +270,6 @@ export default function StudentMentorPage() {
                   </Button>
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Common ways to interact with your mentor</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Button
-                  variant="outline"
-                  className="h-auto py-4 flex flex-col items-center gap-2"
-                  asChild
-                >
-                  <a href={`mailto:${mentor.email}?subject=Question from Student`}>
-                    <MessageCircle className="w-6 h-6" />
-                    <span>Ask a Question</span>
-                  </a>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-auto py-4 flex flex-col items-center gap-2"
-                  asChild
-                >
-                  <a href={`mailto:${mentor.email}?subject=Schedule Meeting Request`}>
-                    <Calendar className="w-6 h-6" />
-                    <span>Schedule Meeting</span>
-                  </a>
-                </Button>
-              </div>
             </CardContent>
           </Card>
         </>

@@ -33,10 +33,7 @@ interface Student {
 }
 
 interface StudentStats {
-  quizzes_completed: number;
   total_points: number;
-  correct_answers: number;
-  total_attempts: number;
 }
 
 interface Feedback {
@@ -198,10 +195,7 @@ export default function AdminStudentsPage() {
       }
 
       setStudentStats(stats || {
-        quizzes_completed: 0,
         total_points: 0,
-        correct_answers: 0,
-        total_attempts: 0,
       });
 
       // Load feedback submitted by this student
@@ -579,26 +573,14 @@ export default function AdminStudentsPage() {
 
                       {/* Stats */}
                       {studentStats && (
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <Card>
                             <CardContent className="p-6">
                               <div className="text-center">
                                 <Trophy className="w-8 h-8 text-purple-600 mx-auto mb-2" />
                                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Points</p>
                                 <p className="text-2xl font-bold text-purple-600">
-                                  {studentStats.total_points.toLocaleString()}
-                                </p>
-                              </div>
-                            </CardContent>
-                          </Card>
-
-                          <Card>
-                            <CardContent className="p-6">
-                              <div className="text-center">
-                                <Target className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Quizzes</p>
-                                <p className="text-2xl font-bold text-green-600">
-                                  {studentStats.quizzes_completed}
+                                  {studentStats.total_points?.toLocaleString() || 0}
                                 </p>
                               </div>
                             </CardContent>
@@ -608,23 +590,9 @@ export default function AdminStudentsPage() {
                             <CardContent className="p-6">
                               <div className="text-center">
                                 <TrendingUp className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Accuracy</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">Leaderboard Points</p>
                                 <p className="text-2xl font-bold text-blue-600">
-                                  {studentStats.total_attempts > 0
-                                    ? Math.round((studentStats.correct_answers / studentStats.total_attempts) * 100)
-                                    : 0}%
-                                </p>
-                              </div>
-                            </CardContent>
-                          </Card>
-
-                          <Card>
-                            <CardContent className="p-6">
-                              <div className="text-center">
-                                <Users className="w-8 h-8 text-orange-600 mx-auto mb-2" />
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Correct/Total</p>
-                                <p className="text-2xl font-bold text-orange-600">
-                                  {studentStats.correct_answers}/{studentStats.total_attempts}
+                                  {selectedStudent?.leaderboard_points?.toLocaleString() || 0}
                                 </p>
                               </div>
                             </CardContent>

@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { adjustPointsManual } from '@/utils/points'
 
 /**
  * Submit a student's answer to a quiz question
@@ -165,14 +166,16 @@ export async function submitAnswer(
           })
       }
 
-      // Update profiles table's leaderboard_points column
-      // This provides quick access to user's total points without joining tables
-      await supabase
-        .from('profiles')
-        .update({
-          leaderboard_points: (leaderboardEntry?.total_points || 0) + pointsEarned,
-        })
-        .eq('id', user.id)
+      // Award points using the unified points system
+      // This updates both points and leaderboard_points in profiles table
+      await adjustPointsManual({
+        userId: user.id,
+        actionType: 'quiz_completion',
+        points: pointsEarned,
+        referenceId: sessionId,
+        referenceType: 'quiz_session',
+        description: `Quiz question ${questionIndex + 1}: ${pointsEarned} points (streak: ${newStreak})`
+      })
     } else if (!isCorrect) {
       // Track incorrect answers in leaderboard stats
       const { data: leaderboardEntry } = await supabase

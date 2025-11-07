@@ -28,9 +28,6 @@ interface LeaderboardStats {
   quiz_points: number
   assignment_points: number
   bonus_points: number
-  quizzes_completed: number
-  correct_answers: number
-  total_attempts: number
   rank: number
 }
 
@@ -152,9 +149,6 @@ export function ProfileTab() {
           quiz_points: data.quiz_points || 0,
           assignment_points: data.assignment_points || 0,
           bonus_points: data.bonus_points || 0,
-          quizzes_completed: data.quizzes_completed || 0,
-          correct_answers: data.correct_answers || 0,
-          total_attempts: data.total_attempts || 0,
           rank: rank,
         })
       }
@@ -412,47 +406,6 @@ export function ProfileTab() {
                     </p>
                   </div>
                   <Trophy className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                </div>
-              </div>
-
-              {/* Quizzes Completed */}
-              <div className="p-3 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-green-600 dark:text-green-400">Completed</p>
-                    <p className="text-xl font-bold text-green-900 dark:text-white">
-                      {leaderboardStats.quizzes_completed || 0}
-                    </p>
-                  </div>
-                  <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-                </div>
-              </div>
-
-              {/* Accuracy */}
-              <div className="p-3 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-amber-600 dark:text-amber-400">Accuracy</p>
-                    <p className="text-xl font-bold text-amber-900 dark:text-white">
-                      {leaderboardStats && leaderboardStats.total_attempts > 0
-                        ? Math.round((leaderboardStats.correct_answers / leaderboardStats.total_attempts) * 100)
-                        : 0}%
-                    </p>
-                  </div>
-                  <Target className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-                </div>
-              </div>
-
-              {/* Correct Answers */}
-              <div className="p-3 bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 rounded-lg border border-teal-200 dark:border-teal-800">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-teal-600 dark:text-teal-400">Correct</p>
-                    <p className="text-xl font-bold text-teal-900 dark:text-white">
-                      {leaderboardStats.correct_answers || 0}/{leaderboardStats.total_attempts || 0}
-                    </p>
-                  </div>
-                  <CheckCircle className="h-6 w-6 text-teal-600 dark:text-teal-400" />
                 </div>
               </div>
 
