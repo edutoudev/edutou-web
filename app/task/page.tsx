@@ -401,6 +401,21 @@ export default function StudentTasksPage() {
       return
     }
 
+    // VALIDATION: Only allow marking as complete if there's actual submission data
+    if (newCompletedState) {
+      const hasTextContent = completion?.text_content && completion.text_content.trim().length > 0
+      const hasLinkUrl = completion?.link_url && completion.link_url.trim().length > 0
+      const hasFileUrl = completion?.file_url && completion.file_url.trim().length > 0
+      const hasFileUrls = completion?.file_urls && completion.file_urls.length > 0
+
+      const hasAnySubmission = hasTextContent || hasLinkUrl || hasFileUrl || hasFileUrls
+
+      if (!hasAnySubmission) {
+        alert('Please submit your work before marking this step as complete. Use the input fields below to add your submission.')
+        return
+      }
+    }
+
     await handleStepSubmit(task, step, {
       is_completed: newCompletedState,
       text_content: completion?.text_content,
