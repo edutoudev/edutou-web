@@ -8,5 +8,17 @@ export function createClient() {
     throw new Error('Missing Supabase environment variables')
   }
 
-  return createBrowserClient(supabaseUrl, supabaseKey)
+  return createBrowserClient(supabaseUrl, supabaseKey, {
+    realtime: {
+      params: {
+        eventsPerSecond: 10,
+      },
+      timeout: 999999999, // Effectively infinite timeout (999,999 seconds ≈ 11.5 days)
+    },
+    global: {
+      headers: {
+        'x-client-info': 'edutou-platform',
+      },
+    },
+  })
 }

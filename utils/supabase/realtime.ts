@@ -90,9 +90,15 @@ export class QuizRealtimeClient {
         } else if (status === 'CHANNEL_ERROR') {
           console.error(`❌ Error subscribing to participants for session: ${sessionId}`)
           console.error(`💡 Make sure Realtime is enabled for 'session_participants' table in Supabase Dashboard → Database → Replication`)
+          // Auto-retry on error after 5 seconds
+          setTimeout(() => {
+            console.log(`🔄 Retrying subscription for participants: ${sessionId}`)
+            this.subscribeToParticipants(sessionId, callback)
+          }, 5000)
         } else if (status === 'TIMED_OUT') {
-          console.error(`⏱️ Subscription timed out for session: ${sessionId}`)
-          console.error(`💡 Check if Realtime is enabled for 'session_participants' table`)
+          console.warn(`⏱️ Subscription timed out for session: ${sessionId} - retrying...`)
+          // Auto-retry on timeout immediately
+          this.subscribeToParticipants(sessionId, callback)
         } else if (status === 'CLOSED') {
           console.warn(`🔒 Subscription closed for session: ${sessionId}`)
         }
@@ -135,9 +141,15 @@ export class QuizRealtimeClient {
         } else if (status === 'CHANNEL_ERROR') {
           console.error(`❌ Error subscribing to session for: ${sessionId}`)
           console.error(`💡 Make sure Realtime is enabled for 'quiz_sessions' table in Supabase Dashboard → Database → Replication`)
+          // Auto-retry on error after 5 seconds
+          setTimeout(() => {
+            console.log(`🔄 Retrying subscription for session: ${sessionId}`)
+            this.subscribeToSession(sessionId, callback)
+          }, 5000)
         } else if (status === 'TIMED_OUT') {
-          console.error(`⏱️ Session subscription timed out: ${sessionId}`)
-          console.error(`💡 Check if Realtime is enabled for 'quiz_sessions' table`)
+          console.warn(`⏱️ Session subscription timed out: ${sessionId} - retrying...`)
+          // Auto-retry on timeout immediately
+          this.subscribeToSession(sessionId, callback)
         } else if (status === 'CLOSED') {
           console.warn(`🔒 Session subscription closed: ${sessionId}`)
         }
@@ -180,9 +192,15 @@ export class QuizRealtimeClient {
         } else if (status === 'CHANNEL_ERROR') {
           console.error(`❌ Error subscribing to answers for: ${sessionId}`)
           console.error(`💡 Make sure Realtime is enabled for 'session_answers' table in Supabase Dashboard → Database → Replication`)
+          // Auto-retry on error after 5 seconds
+          setTimeout(() => {
+            console.log(`🔄 Retrying subscription for answers: ${sessionId}`)
+            this.subscribeToAnswers(sessionId, callback)
+          }, 5000)
         } else if (status === 'TIMED_OUT') {
-          console.error(`⏱️ Answer subscription timed out: ${sessionId}`)
-          console.error(`💡 Check if Realtime is enabled for 'session_answers' table`)
+          console.warn(`⏱️ Answer subscription timed out: ${sessionId} - retrying...`)
+          // Auto-retry on timeout immediately
+          this.subscribeToAnswers(sessionId, callback)
         } else if (status === 'CLOSED') {
           console.warn(`🔒 Answer subscription closed: ${sessionId}`)
         }

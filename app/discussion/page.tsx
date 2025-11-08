@@ -212,18 +212,85 @@ function ThreadCard({ thread, onVote, currentUserId, onCommentAdded, onThreadCli
         return
       }
 
-      // Award points for commenting on discussion (don't fail if points system fails)
+      // Award points for commenting - manually update all tables
       if (data) {
         try {
-          await awardPoints({
-            userId: currentUserId,
-            actionType: 'discussion_comment',
-            referenceId: data.id,
-            referenceType: 'discussion_comment',
-            description: `Commented on: ${thread.title}`
-          })
+          const pointsToAward = 50 // Points for commenting on a discussion
+
+          // Step 1: Get current user's leaderboard_points from profiles
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('leaderboard_points')
+            .eq('id', currentUserId)
+            .single()
+
+          if (profileError) {
+            console.error('Error fetching profile:', profileError)
+            throw profileError
+          }
+
+          // Step 2: Update profiles.leaderboard_points
+          const newLeaderboardPoints = (profileData?.leaderboard_points || 0) + pointsToAward
+          const { error: updateProfileError } = await supabase
+            .from('profiles')
+            .update({ leaderboard_points: newLeaderboardPoints })
+            .eq('id', currentUserId)
+
+          if (updateProfileError) {
+            console.error('Error updating profile points:', updateProfileError)
+            throw updateProfileError
+          }
+
+          // Step 3: Update leaderboard table
+          const { data: leaderboardEntry } = await supabase
+            .from('leaderboard')
+            .select('*')
+            .eq('user_id', currentUserId)
+            .maybeSingle()
+
+          if (leaderboardEntry) {
+            // Update existing leaderboard entry
+            await supabase
+              .from('leaderboard')
+              .update({
+                total_points: (leaderboardEntry.total_points || 0) + pointsToAward,
+                bonus_points: (leaderboardEntry.bonus_points || 0) + pointsToAward,
+                last_activity: new Date().toISOString(),
+              })
+              .eq('user_id', currentUserId)
+          } else {
+            // Create new leaderboard entry
+            await supabase
+              .from('leaderboard')
+              .insert({
+                user_id: currentUserId,
+                total_points: pointsToAward,
+                quiz_points: 0,
+                assignment_points: 0,
+                bonus_points: pointsToAward,
+                quizzes_completed: 0,
+                correct_answers: 0,
+                total_attempts: 0,
+                last_activity: new Date().toISOString(),
+              })
+          }
+
+          // Step 4: Record in points history (optional but good for tracking)
+          try {
+            await awardPoints({
+              userId: currentUserId,
+              actionType: 'discussion_comment',
+              referenceId: data.id,
+              referenceType: 'discussion_comment',
+              description: `Commented on: ${thread.title}`
+            })
+          } catch (historyError) {
+            console.warn('Failed to record in points history:', historyError)
+          }
+
+          console.log(`✅ Awarded ${pointsToAward} points for commenting`)
         } catch (pointsError) {
-          console.warn('Failed to award points:', pointsError)
+          console.error('❌ Error awarding points:', pointsError)
           // Continue anyway - points are optional
         }
       }
@@ -522,18 +589,85 @@ function CreateThreadModal({ onThreadCreated, isOpen: externalIsOpen, setIsOpen:
         return
       }
 
-      // Award points for creating a discussion (don't fail if points system fails)
+      // Award points for creating a discussion - manually update all tables
       if (data) {
         try {
-          await awardPoints({
-            userId: user.id,
-            actionType: 'discussion_create',
-            referenceId: data.id,
-            referenceType: 'discussion',
-            description: `Created discussion: ${title.trim()}`
-          })
+          const pointsToAward = 100 // Points for creating a discussion
+
+          // Step 1: Get current user's leaderboard_points from profiles
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('leaderboard_points')
+            .eq('id', user.id)
+            .single()
+
+          if (profileError) {
+            console.error('Error fetching profile:', profileError)
+            throw profileError
+          }
+
+          // Step 2: Update profiles.leaderboard_points
+          const newLeaderboardPoints = (profileData?.leaderboard_points || 0) + pointsToAward
+          const { error: updateProfileError } = await supabase
+            .from('profiles')
+            .update({ leaderboard_points: newLeaderboardPoints })
+            .eq('id', user.id)
+
+          if (updateProfileError) {
+            console.error('Error updating profile points:', updateProfileError)
+            throw updateProfileError
+          }
+
+          // Step 3: Update leaderboard table
+          const { data: leaderboardEntry } = await supabase
+            .from('leaderboard')
+            .select('*')
+            .eq('user_id', user.id)
+            .maybeSingle()
+
+          if (leaderboardEntry) {
+            // Update existing leaderboard entry
+            await supabase
+              .from('leaderboard')
+              .update({
+                total_points: (leaderboardEntry.total_points || 0) + pointsToAward,
+                bonus_points: (leaderboardEntry.bonus_points || 0) + pointsToAward,
+                last_activity: new Date().toISOString(),
+              })
+              .eq('user_id', user.id)
+          } else {
+            // Create new leaderboard entry
+            await supabase
+              .from('leaderboard')
+              .insert({
+                user_id: user.id,
+                total_points: pointsToAward,
+                quiz_points: 0,
+                assignment_points: 0,
+                bonus_points: pointsToAward,
+                quizzes_completed: 0,
+                correct_answers: 0,
+                total_attempts: 0,
+                last_activity: new Date().toISOString(),
+              })
+          }
+
+          // Step 4: Record in points history (optional but good for tracking)
+          try {
+            await awardPoints({
+              userId: user.id,
+              actionType: 'discussion_create',
+              referenceId: data.id,
+              referenceType: 'discussion',
+              description: `Created discussion: ${title.trim()}`
+            })
+          } catch (historyError) {
+            console.warn('Failed to record in points history:', historyError)
+          }
+
+          console.log(`✅ Awarded ${pointsToAward} points for creating discussion`)
         } catch (pointsError) {
-          console.warn('Failed to award points:', pointsError)
+          console.error('❌ Error awarding points:', pointsError)
           // Continue anyway - points are optional
         }
       }

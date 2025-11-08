@@ -54,23 +54,10 @@ export default function StudentLobbyPage() {
     // Prevent multiple join attempts
     if (hasJoined) return
 
-    // Auto-join when page loads
-    const timeoutId = setTimeout(() => {
-      if (loading) {
-        console.error('Join timeout - taking too long to load')
-        setLoading(false)
-        alert('Connection timeout. Please check your internet and try again.')
-        router.push('/quiz')
-      }
-    }, 10000) // 10 second timeout
-
+    // Auto-join when page loads (no timeout - wait indefinitely)
     // Mark as joined to prevent duplicate calls
     setHasJoined(true)
     handleJoin()
-
-    return () => {
-      clearTimeout(timeoutId)
-    }
   }, [sessionCode])
 
   useEffect(() => {
@@ -185,7 +172,7 @@ export default function StudentLobbyPage() {
     }
   }
 
-  // Show loading while joining - has 10 second timeout for safety
+  // Show loading while joining - no timeout, wait indefinitely
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-850 dark:to-slate-800 flex items-center justify-center p-4">
