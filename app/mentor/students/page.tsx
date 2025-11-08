@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Search, Users, Trophy, Target, TrendingUp, ArrowLeft, MessageSquare, Star, Mail, Plus, Minus } from 'lucide-react';
+import { Loader2, Search, Users, Trophy, Target, TrendingUp, ArrowLeft, MessageSquare, Star, Mail, Plus, Minus, RotateCcw } from 'lucide-react';
 import { adjustPointsManual } from '@/utils/points';
 import { getRankFromPoints } from '@/lib/ranks';
 import { cn } from '@/lib/utils';
@@ -47,6 +47,7 @@ export default function MentorStudentsPage() {
   const [studentStats, setStudentStats] = useState<any>(null);
   const [pointsAmount, setPointsAmount] = useState<number>(10);
   const [adjustingPoints, setAdjustingPoints] = useState(false);
+  const [resettingPoints, setResettingPoints] = useState(false);
 
   const supabase = createClient();
 
@@ -273,6 +274,96 @@ export default function MentorStudentsPage() {
     }
   };
 
+  const handleResetAllPoints = async () => {
+    if (students.length === 0) {
+      alert('No students to reset points for');
+      return;
+    }
+
+    const confirmed = confirm(
+      `Are you sure you want to reset points for ALL ${students.length} student(s) to 0?\n\nThis action cannot be undone and will:\n- Set leaderboard_points to 0 in profiles\n- Reset all points in leaderboard table\n- Record this action in points history\n\nClick OK to confirm.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setResettingPoints(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('You must be logged in');
+        return;
+      }
+
+      const studentIds = students.map(s => s.id);
+
+      // Reset leaderboard_points in profiles table
+      const { error: profilesError } = await supabase
+        .from('profiles')
+        .update({ leaderboard_points: 0 })
+        .in('id', studentIds);
+
+      if (profilesError) {
+        throw new Error(`Failed to reset profile points: ${profilesError.message}`);
+      }
+
+      // Reset points in leaderboard table
+      const { error: leaderboardError } = await supabase
+        .from('leaderboard')
+        .update({
+          total_points: 0,
+          quiz_points: 0,
+          assignment_points: 0,
+          bonus_points: 0,
+          last_activity: new Date().toISOString(),
+        })
+        .in('user_id', studentIds);
+
+      if (leaderboardError && leaderboardError.code !== 'PGRST116') {
+        console.error('Leaderboard error:', leaderboardError);
+      }
+
+      // Record the reset in points history for each student
+      for (const studentId of studentIds) {
+        await adjustPointsManual({
+          userId: studentId,
+          actionType: 'manual_points_reset' as any,
+          points: 0,
+          referenceId: user.id,
+          referenceType: 'mentor_reset_all',
+          description: `All points reset to 0 by mentor`
+        });
+      }
+
+      // Update local state
+      setStudents(students.map(s => ({
+        ...s,
+        leaderboard_points: 0,
+        stats: s.stats ? { ...s.stats, total_points: 0 } : undefined
+      })));
+
+      // If viewing a student, update their details too
+      if (selectedStudent) {
+        setSelectedStudent({
+          ...selectedStudent,
+          leaderboard_points: 0
+        });
+        if (studentStats) {
+          setStudentStats({
+            ...studentStats,
+            total_points: 0,
+          });
+        }
+      }
+
+      alert(`Successfully reset points for ${students.length} student(s) to 0!`);
+    } catch (error) {
+      console.error('Error resetting all points:', error);
+      alert(`An error occurred while resetting points: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setResettingPoints(false);
+    }
+  };
+
   const filteredStudents = students.filter((student) =>
     student.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     student.email.toLowerCase().includes(searchQuery.toLowerCase())
@@ -389,6 +480,31 @@ export default function MentorStudentsPage() {
                         </p>
                       </div>
                       <Trophy className="w-10 h-10 text-purple-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-2 border-red-200 dark:border-red-800">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col gap-2">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Reset All Points</p>
+                      <Button
+                        onClick={handleResetAllPoints}
+                        disabled={resettingPoints || students.length === 0}
+                        className="w-full bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white font-semibold"
+                      >
+                        {resettingPoints ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <RotateCcw className="w-4 h-4 mr-2" />
+                            Reset to 0
+                          </>
+                        )}
+                      </Button>
+                      <p className="text-xs text-red-600 dark:text-red-400">
+                        Sets all students to 0 points
+                      </p>
                     </div>
                   </CardContent>
                 </Card>

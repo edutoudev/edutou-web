@@ -129,19 +129,29 @@ function LeaderboardContent() {
 
       console.log('Fetched leaderboard from profiles:', data)
 
-      // Format data and calculate rank on client side
-      const formattedData: LeaderboardEntry[] = data.map((entry: any, index) => ({
-        user_id: entry.id,
-        total_points: entry.leaderboard_points || 0,
-        quiz_points: 0, // Will be populated if you have separate quiz tracking
-        assignment_points: 0,
-        bonus_points: 0,
-        last_activity: entry.created_at,
-        rank: index + 1,
-        full_name: entry.full_name || null,
-        email: entry.email || null,
-        role: entry.role || null,
-      }))
+      // Format data and calculate rank on client side with proper tie handling
+      const formattedData: LeaderboardEntry[] = data.map((entry: any, index) => {
+        // Calculate rank: same points = same rank
+        let rank = 1
+        for (let i = 0; i < index; i++) {
+          if (data[i].leaderboard_points > entry.leaderboard_points) {
+            rank++
+          }
+        }
+
+        return {
+          user_id: entry.id,
+          total_points: entry.leaderboard_points || 0,
+          quiz_points: 0, // Will be populated if you have separate quiz tracking
+          assignment_points: 0,
+          bonus_points: 0,
+          last_activity: entry.created_at,
+          rank: rank,
+          full_name: entry.full_name || null,
+          email: entry.email || null,
+          role: entry.role || null,
+        }
+      })
 
       setLeaderboardData(formattedData)
 
@@ -203,17 +213,27 @@ function LeaderboardContent() {
         throw new Error(`Failed to load participants: ${participantsError.message}`)
       }
 
-      // Format data with ranks
-      const formattedParticipants: SessionParticipant[] = (participants || []).map((p, index) => ({
-        id: p.id,
-        nickname: p.nickname,
-        total_score: p.total_score || 0,
-        correct_answers: p.correct_answers || 0,
-        questions_answered: p.questions_answered || 0,
-        current_streak: p.current_streak || 0,
-        best_streak: p.best_streak || 0,
-        rank: index + 1,
-      }))
+      // Format data with ranks - handle ties properly
+      const formattedParticipants: SessionParticipant[] = (participants || []).map((p, index) => {
+        // Calculate rank: same score = same rank
+        let rank = 1
+        for (let i = 0; i < index; i++) {
+          if (participants[i].total_score > p.total_score) {
+            rank++
+          }
+        }
+
+        return {
+          id: p.id,
+          nickname: p.nickname,
+          total_score: p.total_score || 0,
+          correct_answers: p.correct_answers || 0,
+          questions_answered: p.questions_answered || 0,
+          current_streak: p.current_streak || 0,
+          best_streak: p.best_streak || 0,
+          rank: rank,
+        }
+      })
 
       setSessionParticipants(formattedParticipants)
 
